@@ -1,0 +1,219 @@
+// === FILE: ItineraryGenerator.tsx ===
+import React, { useState } from 'react';
+import { MapPin, Calendar, Clock, Loader2, ArrowRight, BookOpen, Volume2 } from 'lucide-react';
+
+interface ItineraryDay {
+  name: string;
+  description: string;
+  estimated_travel_time: string;
+  story?: string;
+}
+
+interface ItineraryResponse {
+  [key: string]: ItineraryDay[];
+}
+
+const ItineraryGenerator: React.FC = () => {
+  const [formData, setFormData] = useState({
+    destination_city: '',
+    hotel_address: '',
+    duration_days: 3
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [itinerary, setItinerary] = useState<ItineraryResponse | null>(null);
+  const [error, setError] = useState('');
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'duration_days' ? parseInt(value) : value
+    }));
+  };
+
+  const generateItinerary = async () => {
+    if (!formData.destination_city || !formData.hotel_address) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/workflows/smart-itinerary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate itinerary');
+      }
+
+      const result = await response.json();
+      setItinerary(result);
+    } catch (err) {
+      setError('Unable to generate itinerary. Please try again or check your destination.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const speakStory = (story: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(story);
+      utterance.rate = 0.8;
+      utterance.pitch = 1;
+      speechSynthesis.speak(utterance);
+    }
+  };
+
+  return (
+    <div className="min-h-screen py-8 bg-gradient-to-br from-orange-50 via-yellow-50 to-pink-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-orange-500 to-pink-500 rounded-2xl mb-6 shadow-lg">
+            <MapPin className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Smart Itinerary Generator</h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Let our AI create a time-optimized travel plan based on your hotel location and preferences
+          </p>
+        </div>
+
+        <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 mb-8 border border-orange-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Destination City *
+              </label>
+              <input
+                type="text"
+                name="destination_city"
+                value={formData.destination_city}
+                onChange={handleInputChange}
+                placeholder="e.g., Shillong"
+                className="w-full px-4 py-3 border border-orange-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all bg-white/80"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Duration (Days)
+              </label>
+              <select
+                name="duration_days"
+                value={formData.duration_days}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-orange-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all bg-white/80"
+              >
+                {[1, 2, 3, 4, 5, 6, 7].map(day => (
+                  <option key={day} value={day}>{day} {day === 1 ? 'Day' : 'Days'}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Hotel Address *
+              </label>
+              <input
+                type="text"
+                name="hotel_address"
+                value={formData.hotel_address}
+                onChange={handleInputChange}
+                placeholder="e.g., Police Bazar, Shillong, Meghalaya"
+                className="w-full px-4 py-3 border border-orange-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all bg-white/80"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 shadow-sm">
+              <p className="text-red-700">{error}</p>
+            </div>
+          )}
+
+          <button
+            onClick={generateItinerary}
+            disabled={isLoading}
+            className="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white py-4 rounded-xl font-semibold text-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center space-x-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Generating Your Perfect Itinerary...</span>
+              </>
+            ) : (
+              <>
+                <span>Generate Smart Itinerary</span>
+                <ArrowRight className="w-5 h-5" />
+              </>
+            )}
+          </button>
+        </div>
+
+        {itinerary && (
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 border border-orange-100">
+            <h2 className="text-3xl font-bold text-gray-900 mb-8 flex items-center">
+              <Calendar className="w-8 h-8 mr-3 text-orange-600" />
+              Your Optimized Itinerary
+            </h2>
+
+            <div className="space-y-8">
+              {Object.entries(itinerary).map(([day, attractions], dayIndex) => (
+                <div key={day} className="border-l-4 border-orange-400 pl-6">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4 capitalize">
+                    Day {dayIndex + 1}
+                  </h3>
+                  <div className="space-y-4">
+                    {attractions.map((attraction, index) => (
+                      <div key={index} className="bg-gradient-to-r from-orange-50 to-pink-50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 border border-orange-100">
+                        <div className="space-y-4">
+                          <div className="flex-1">
+                            <h4 className="text-xl font-semibold text-gray-900 mb-2">
+                              {attraction.name}
+                            </h4>
+                            <p className="text-gray-600 mb-3 leading-relaxed">
+                              {attraction.description}
+                            </p>
+                            <div className="flex items-center text-sm text-orange-600 font-medium mb-3">
+                              <Clock className="w-4 h-4 mr-1" />
+                              {attraction.estimated_travel_time}
+                            </div>
+                            {attraction.story && (
+                              <div className="bg-white/60 rounded-xl p-4 border border-orange-200">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h5 className="font-semibold text-gray-800 flex items-center">
+                                    <BookOpen className="w-4 h-4 mr-2 text-orange-600" />
+                                    Story & Legend
+                                  </h5>
+                                  <button
+                                    onClick={() => speakStory(attraction.story!)}
+                                    className="p-1 rounded-lg hover:bg-orange-100 transition-colors"
+                                  >
+                                    <Volume2 className="w-4 h-4 text-orange-600" />
+                                  </button>
+                                </div>
+                                <p className="text-sm text-gray-700 leading-relaxed">{attraction.story}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ItineraryGenerator;
